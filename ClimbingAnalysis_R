@@ -1,0 +1,476 @@
+---
+title: "Climb Dataset - Data Analysis"
+author: Rony Avivi, Or Somech.
+output:
+  html_document:
+    code_folding: show
+---
+
+<style>
+#grad1 {
+  height: 230px;
+  background-color: white; /* For browsers that do not support gradients */
+  background-image: linear-gradient(to bottom right, white, lightblue);
+}
+p  { font-family : Arial ; font-size : 10pt ; color : black ; padding-top : 14px  line-height :120%; }
+h1 { font-family : Arial ; font-size : 20pt ; font-weight :bold; color : greenyellow ; padding-top : 16px  line-height :30px; }
+h2 { font-family : Arial ; font-size : 16pt ; font-weight :bold; color : lightblue ; padding-top : 16px line-height :30px; }
+h3 { font-family : Arial ; font-size : 14pt ; font-weight :bold; color : greenyellow ; padding-top : 16px ; line-height :30px; }
+h4 { font-family : Arial ; font-size : 11pt ; font-weight :bold; color : greenyellow ; padding-top : 12px ; line-height :30px; }
+
+.link1 {font-family: Arial, Helvetica, sans-serif;	font-size: 16px;	color: greenyellow;	font-weight: bold;	text-decoration: none;	line-height: 150%;}
+.link1:hover{font-family: Arial, Helvetica, sans-serif;	font-size: 16px;	color: greenyellow;	font-weight: bold;	text-decoration: italic;	line-height: 150%;}
+</style>
+
+```{css, echo=FALSE}
+html_document:
+        number_sections: true
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(gridExtra)
+```
+
+<center>
+<img src=https://www.chronline.com/uploads/original/20201204-041640-251dab738fb59081f6cf06b89b2eee4f.jpg width=1200>
+</center>
+
+# <span style= "color:greenyellow">Introduction
+
+Mount Rainier, "An Icon on the Horizon",stands as an icon in the Washington landscape. Mount Rainier is an active volcano,ascending to 14,410 feet above sea level. It's known to be the most glaciated peak in the contiguous U.S.A., spawning five major rivers.<br>
+
+In this study, we will analyze historical weather records and climbing records to examine the relationships between weather features (such as average temperature, wind speed, etc.) and months, and determine how weather affects climbing success rates. <br>
+
+In our project you will get familiar with the common weather conditions on this majestic mountain, the different routes to the summit, and the climbing statistics. 
+
+We will focus on:
+<ol>
+<li>Tidying our data.</li>
+<li>Creating visualizations to understand relations between different features.</li> 
+<li>Creating tests and models to check a variety of hypotheses.</li>
+</ol>
+Our goals are to demonstrate and practice the different methods which we have learned about in the course by examining the relationship between the different variables from our data set.
+
+##### <span style= "color:black"> Let`s start climbing! <br>
+
+
+# Part One - Data Import And Tidying
+
+### <span style= "color:black"> Explaining our Dataset
+
+the "Mount Rainier Weather and Climbing Data" was taken from kaggle. <br>
+The weather has been captured from https://www.nwac.us
+and the climbing statistics from http://www.mountrainierclimbing.us/routes.
+The data comes in a csv file. <br>
+
+Content: <br>
+climbing_statistics.csv - contains data for 4000+ groups who tried to climb the summit between 2014-2015. <br> 
+Rainier_Weather.csv - contains data for 450+ daily weather conditions on the mountain. <br> 
+
+``` {r}
+# Reading the data
+climbing_statistics <- read.csv('C:\\Users\\User\\Desktop\\data science\\D\\Data analysis\\Data analysis Project\\climbing_statistics.csv')
+weather_statistics <- read.csv('C:\\Users\\User\\Desktop\\data science\\D\\Data analysis\\Data analysis Project\\Rainier_Weather.csv')
+```
+
+Let's take a look at our data using glimpse function:
+```{r  class.source = 'fold-hide'}
+glimpse(climbing_statistics)
+
+```
+```{r  class.source = 'fold-hide'}
+glimpse(weather_statistics)
+```
+
+### <span style= "color:black"> Explaining each feature:
+
+#### climbing_statistics.csv
+**Date** - a date between 2014-2015. <br> 
+**Route** - route name. <br>
+**Attempted** - number of people attempted climbing to the summit on specific date. <br>
+**Succeeded** - number of people succeeded climbing to the summit on  specific date. <br>
+**Success Percentage** - percentage of the people succeeded climbing to the summit on a specific date. <br>
+
+
+#### Rainier_Weather.csv
+**Date** - a date between 2014-2015. <br>
+**Battery Voltage AVG** - average battery voltage. <br>
+**Temperature AVG** - day's average temperature. <br>
+**Relative Humidity AVG** - day's average humidity. <br>
+**Wind Speed Daily AVG** - day's average wind speed. <br>
+**Wind Direction AVG** - day's average wind direction. <br>
+**Solare Radiation AVG** - day's average solar radiation. <br>
+
+
+### Tidying our data:
+As you can see we have two separated data sets. Both are linked together by the “Date” column. <br>
+The problems we encountered to tidy our data:<br>
+<ol>
+<li>The "Date" parameter in the climbing_statistics csv has punctuation characters in it.</li>
+<li>The "Date" parameter in both data sets is char, we would like to convert it to numeric.</li>
+<li>The "Succeeded" parameter was greater than the "Attempted"   parameter in some of the rows because of wrong data.</li>
+</ol>
+
+
+```{r}
+# Fixing the "Date" parameter name in the climbing_statistics csv
+colnames(climbing_statistics)[1] <- c("Date")
+```
+
+```{r}
+# Extract year and month - for climbing data
+climbing_statistics$DATE<- as.Date(climbing_statistics$Date,format="%m/%d/%Y")
+  climbing_statistics$YEAR<- as.numeric(format(climbing_statistics$DATE,"%Y"))
+  climbing_statistics$MONTH<-as.numeric(format(climbing_statistics$DATE,'%m'))
+   
+# Sanity check
+head(climbing_statistics, n=10)
+
+# Extract year and month - for weather data
+weather_statistics$DATE<-as.Date(weather_statistics$Date, format="%m/%d/%Y")
+  weather_statistics$YEAR<-as.numeric(format(weather_statistics$DATE, "%Y"))
+  weather_statistics$MONTH<-as.numeric(format(weather_statistics$DATE,"%m"))
+  
+# Sanity check
+head(weather_statistics, n=10)
+
+```
+
+```{r}
+# Extracting rows where the "Succeeded" value is greater than "Attempted" value 
+
+climbing_statistics <- climbing_statistics %>% filter(climbing_statistics$Succeeded <= climbing_statistics$Attempted) 
+
+```
+
+# Part 2 - Visualization
+
+We examined our data through different visualizations to analyze connections between different variables using the `ggplot2` package.<br>
+
+First, we want to create some general plots to help us understand our features better. <br>
+
+#### Attempts and successes
+
+We created a plot that counts the number of people who attempted climbing the mountain and counts the number of those who succeeded reaching the summit. <br>
+
+```{r}
+
+ggplot(climbing_statistics, aes(x=Attempted, y=Succeeded),xlab("Attempt counts"), ylab("Success counts"))+ geom_point(color='orange',fill='orange',size=3)+ ylim(0,15) +xlim(0,26)
+
+```
+
+#### Plotting routes popularity
+
+The routes parameter had 26 unique categories, let's check which is the most popular route! <br>
+
+```{r}
+ggplot(climbing_statistics,aes(x=Route)) + geom_bar(color = "black",fill="lightsalmon") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+As we can see from the histogram, "Disapointment Cleaver" is the most popular route. <br>
+
+#### Attempts and successes over months 
+
+Let's get down to business! we would like to check the connection between attempts and successes over month. <br>
+
+```{r}
+AttemptsChart<-ggplot(data=climbing_statistics, aes(x=as.factor(MONTH), y=Attempted)) + geom_boxplot(fill="pink") +
+  ggtitle("Attempts Over Months") + xlab("Month") + ylab("Attempted count") + theme_minimal() +
+  ylim(0,15) + theme(axis.text.x = element_text(angle = 50,  hjust = 1))
+
+SuccessesChart<-ggplot(data=climbing_statistics, aes(x=as.factor(MONTH), y=Succeeded)) + geom_boxplot(fill="lightgreen") +
+  ggtitle("Successes Over Months") + xlab("Month") + ylab("Succeeded count") + theme_minimal() +
+  ylim(0,15) + theme(axis.text.x = element_text(angle = 50, hjust = 1)) 
+
+  grid.arrange(AttemptsChart, SuccessesChart, nrow= 1)
+
+```
+
+As we can see from the box plots, although most of the people attempt climbing on September, the number of people who succeeded reaching the summit is greater in July.<br>
+
+Because we know most successes happen in the summer, we would like to check the relations between some weather conditions (that we are assuming have a great affect on the success rate) across months and to see if there are any differences between June, July, and August, and the rest of the year. <br>
+
+#### AVG Wind Speed, Relative Humidity and Temperature over Months
+
+```{r}
+ggplot()+
+geom_smooth(weather_statistics,mapping =  aes(x=MONTH,y=Wind.Speed.Daily.AVG,color="Wind.Speed.Daily.AVG"))+
+geom_smooth(weather_statistics,mapping = aes(x=MONTH,y=Relative.Humidity.AVG,color="Relative.Humidity.AVG"))+
+geom_smooth(weather_statistics,mapping = aes(x=MONTH,y=Temperature.AVG,color="Temperature.AVG"))
+
+```
+
+Judging from the graph, the average relative humidity and the average daily wind speed starts to decrease while the average temperature starts to increase when near month of June. <br>
+Perhaps, lower average relative humidity, lower average daily wind speed and higher average temperature will increase the chance of success. <br>
+
+Now, let's expend our check and examine all of the relations between the weather features across months. <br>
+
+#### Weather parameters over months
+
+```{r out.height=350, out.width=350, echo=FALSE}
+
+ggplot(weather_statistics, aes(x=as.factor(MONTH), y=Battery.Voltage.AVG)) + geom_boxplot() + ggtitle("Battery Voltage")
+ggplot(weather_statistics, aes(x=as.factor(MONTH), y=Temperature.AVG)) + geom_boxplot() + ggtitle("Temperature")
+ggplot(weather_statistics, aes(x=as.factor(MONTH), y=Wind.Speed.Daily.AVG)) + geom_boxplot() + ggtitle("Wind Speed")
+ggplot(weather_statistics, aes(x=as.factor(MONTH), y=Wind.Direction.AVG)) + geom_boxplot() + ggtitle("Wind Direction")
+ggplot(weather_statistics, aes(x=as.factor(MONTH), y=Solare.Radiation.AVG)) + geom_boxplot() + ggtitle("Solar Radiation")
+
+```
+
+From the box plots we can see the weather features distribution in each month. <br>
+Generally, we can see that compared to the rest of the year, in the summer months the battery voltage is lower,the temperature is higher, the wind speed is lower and the solar radiation is higher. <br>
+
+# Part 3 - Modeling
+
+### ANOVA test: 
+
+Analysis of Variance (ANOVA) is a statistical technique, commonly used to studying differences between two or more group means. ANOVA in R primarily provides evidence of the existence of the mean equality between the groups. This statistical method is an extension of the t-test. <br>
+
+We want to test our weather data variables across months using ANOVA test. <br>
+<ul>
+<li>$H_{0}$ : the means of the different groups are the same.</li>
+
+<li>$H_{1}$ : At least one sample mean is not equal to the others.</li>
+
+</ul>
+
+```{r}
+
+BatteryOverMonth <- aov(Battery.Voltage.AVG ~ MONTH, data=weather_statistics)
+TempOverMonth <- aov(Temperature.AVG ~ MONTH, data=weather_statistics)
+HumidityOverMonth <- aov(Relative.Humidity.AVG ~ MONTH, data=weather_statistics)
+WindSpeedOverMonth <- aov(Wind.Speed.Daily.AVG ~ MONTH, data=weather_statistics)
+WindDirectionOverMonth <- aov(Wind.Direction.AVG ~ MONTH, data=weather_statistics)
+SolarRadiationOverMonth <- aov(Solare.Radiation.AVG ~ MONTH, data=weather_statistics)
+
+```
+
+Before we use this test we need to assume: <br>
+<ol>
+<li>The data of each factor level are normally distributed.</li>
+<li>These normal populations have a common variance.</li>
+</ol>
+
+#### 1. Checking the normality assumption
+
+```{r out.height=350, out.width=350, echo=FALSE}
+
+plot(BatteryOverMonth, 2)
+plot(TempOverMonth, 2)
+plot(HumidityOverMonth, 2)
+plot(WindSpeedOverMonth, 2)
+plot(WindDirectionOverMonth, 2)
+plot(SolarRadiationOverMonth, 2) 
+
+```
+
+In all of the features, all the points fall approximately along the reference line, so we can assume normality. <br>
+
+#### 2. Checking homogeneity of variances
+
+```{r out.height=350, out.width=350, echo=FALSE}
+
+plot(BatteryOverMonth, 1)
+plot(TempOverMonth, 1)
+plot(HumidityOverMonth, 1)
+plot(WindSpeedOverMonth, 1) 
+plot(WindDirectionOverMonth, 1) 
+plot(SolarRadiationOverMonth, 1) 
+
+```
+
+We can see that: 'TempOverMonth', 'WindDirectionOverMonth' and 'SolarRadiationOverMonth' failed the test for homogeneity of variance.<br> 
+We chose to **not** conduct the ANOVA test on does parameters because this result gives us a strong evidence that the groups are not selected from identical populations. We haven't yet tested whether the means are distinct, but we already know that the variances are different. This is why that may be a good stopping point, because we have strong evidence that the populations the data are sampled from are not identical. <br>
+
+```{r}
+# Performing the ANOVA test
+# Summary of the analysis for: BatteryOverMonth, HumidityOverMonth and WindSpeedOverMonth.
+
+summary(BatteryOverMonth)
+
+summary(HumidityOverMonth)
+
+summary(WindSpeedOverMonth)
+
+```
+### <span style= "color:greenyellow">Interpret the ANOVA Results:
+
+**Df program:** The degrees of freedom for the variable program. This is calculated as #groups -1.<br>
+In our case, there were 2 different workout programs in all the test, so this value is: 2-1 = 1.<br>
+
+**Df Residuals:** The degrees of freedom for the residuals. This is calculated as #total observations – # groups. <br>
+
+**Sum Sq program:** The sum of squares associated with the variable program. <br>
+
+**Sum Sq Residuals:** The sum of squares associated with the residuals or “errors”. <br>
+
+**Mean Sq. Program:** The mean sum of squares associated with program. This is calculated as Sum Sq. program / Df program. <br>
+
+**Mean Sq. Residuals:** The mean sum of squares associated with the residuals. This is calculated as Sum Sq. residuals / Df residuals. <br>
+
+**F Value:** The overall F-statistic of the ANOVA model. This is calculated as Mean Sq. program / Mean sq. <br>
+
+**Pr(>F):** The p-value associated with the F-statistic with numerator df and denominator df. <br>
+The most *important* value in the entire output is the p-value because this tells us whether there is a significant difference in the mean values between the three groups. <br>
+
+### <span style= "color:greenyellow"> Conclusions
+Since the p-values in  all of our ANOVA tables are extremely tiny numbers and less than 0.05, we have sufficient evidence to **reject** all of the null hypothesis.<br>
+
+
+# <span style= "color:greenyellow"> Linear reggression
+
+### <span style= "color:greenyellow">Background
+Due to the fact that there is a connection between temperature and the number of people who succeeded to reach the mountain summit, we assume that as the temperature rises so is the number of people's successes. <br>
+
+### <span style= "color:greenyellow">Transformation
+
+Before we started analyzing the data, we wanted to make sure that it is reliable. <br>
+We can see that there is a gap between the dates in the "weather_statistics" table and the "climbing_statistics" table: <br>
+<ol>
+<li>In "weather_statistics" the earliest and the latest date are not the same as in "climbing_statistics".</li>
+<li>In "climbing_statistics" there are several appearances of the same date. In each appearance there is different value of success according to the route that was chosen.</li>
+</ol>
+
+Here is an example for the mismatches:
+```{r}
+# climbing_statistics.csv
+head(climbing_statistics,7)
+
+# Rainier_Weather.csv
+head(weather_statistics,7)
+
+```
+
+As we can see, in the file "climbing_statistics.csv" the latest date is 27/11/2015 while in the file "Rainier_Weather.csv" it's 31/12/2015. Also we see that in "climbing_statistics.csv" the date 3/10/2015 appears twice. <br><br>
+
+
+We will transform the data so we could examine the influence of the temperature on the number of success climbs in each date. <br>
+
+```{r}
+
+# Transforming the data
+new_climbing_statistics <- climbing_statistics %>% filter(climbing_statistics$DATE >= as.Date("2014-09-23"))
+new_weather_statistics <- weather_statistics %>% filter(weather_statistics$DATE <= as.Date("2015-11-27"))
+
+temperature_success_list <- data.frame(new_weather_statistics$DATE,new_weather_statistics$Temperature.AVG)
+temperature_success_list$success_num <- 0
+
+temp_success_list <- data.frame(new_climbing_statistics$DATE,new_climbing_statistics$Succeeded)
+
+
+for(i in 1:length(temperature_success_list$new_weather_statistics.DATE))
+{
+  day <- temperature_success_list$new_weather_statistics.DATE[i]
+  success_sum <- 0
+  for(j in 1:length(temp_success_list$new_climbing_statistics.DATE))
+  {
+    if(temp_success_list$new_climbing_statistics.DATE[j] == day)
+    {
+      success_sum <- success_sum + temp_success_list$new_climbing_statistics.Succeeded[j]
+    }
+  }
+  temperature_success_list$success_num[i] <- success_sum
+}
+
+```
+### <span style= "color:greenyellow">Test our theory
+
+In order to test our theory, we calculated an average success for each of the temperatures that was measured in the sample.
+The results can be seen in the following graph: <br>
+ 
+```{r warning=FALSE}
+
+mean <-aggregate(temperature_success_list[,3], list(temperature_success_list$new_weather_statistics.Temperature.AVG), mean)
+mean<-rename(mean,temperature=Group.1)
+mean<-rename(mean,num_of_success=x)
+
+ggplot(data=mean, aes(x=temperature, y =num_of_success))+
+  geom_histogram(stat='identity',fill=I("lightblue"), 
+      col=I("darkblue"), size=2)+theme_bw() + labs(y = "average_num_success") + xlim(0,60) + ylim(0,120)
+
+
+```
+<br/><br/>
+It can be seen in the graph that according to our hypothesis, there might be a connection between temperature and the number of climbers who succeeded to reach the summit. We will now examine whether it really exists and if so what is it. <br>
+
+### <span style= "color:greenyellow">Assumptions for linear reggression
+Before we use this test we need to assume: <br>
+<ol>
+<li>$\epsilon$ distributes normally with $(0,\sigma)$.</li>
+<li>$\epsilon$ is homoscedastic.</li>
+</ol>
+
+We will check if our data is homoscedastic and if it distributes normally in the graphs below: <br>
+
+```{r modeling, warning=FALSE}
+temperature_success_lm <- lm(success_num ~ new_weather_statistics.Temperature.AVG, data = temperature_success_list, conf.level = 0.95)
+```
+
+```{r}
+residuals_plot <- temperature_success_lm %>%
+  ggplot(aes(x = .fitted, y = .resid)) + geom_point(alpha = 0.1) + geom_hline(yintercept = 0, color = "red") + labs(title = "Residuals Plot")+theme_bw()
+
+residuals_qq <- temperature_success_lm %>%
+  ggplot(aes(sample = .resid)) + geom_qq() + geom_qq_line(col="red") + labs(title = "Quantile-Quantile Plot")+theme_bw() + labs(x = "theoretical", y = "sample")
+
+grid.arrange(residuals_plot, residuals_qq, nrow = 2)
+
+```
+
+
+The Residuals Plot shows that the data might be heteroscedastic and the QQ Plot shows that the data is distributed normally. <br>
+Nevertheless, we will assume that our data is homoscedastic in order to use the linear regression test. <br>
+
+
+### <span style= "color:greenyellow">Modeling
+
+We would like to calculate the regression equation so that by using temperature we can predict the average number of people who succeeded climbing. That is, to find the connection between the weather and the success of climbing the summit.
+
+$$ Y = \beta_{0} + \beta_{1}X + \epsilon $$
+
+Our hypothesis is that there is a connection between the temperature and the number of people who succeeded climbing. 
+<br/>
+Our hypothesis system:
+
+$$ H_{0}: \beta_{1} = 0 $$
+
+$$ H_{1}: \beta_{1}\ne 0 $$
+
+
+```{r Modeling equation dataset of Linear Regression, message=FALSE, warning=FALSE}
+temperature_success_lm
+```
+
+$$ Y = -20.49 + 1.09X $$
+
+
+```{r summary ,message=FALSE, warning=FALSE}
+summary(temperature_success_lm)
+```
+
+
+```{r}
+ggplot(mean, aes(x=temperature,y=num_of_success))+geom_point(color="darkblue")+
+  stat_smooth(method = "lm", color = "turquoise")+theme_bw()
+```
+
+#### <span style= "color:greenyellow"> Conclusions
+From the linear regression test, it can be seen that $\beta_{1}$ > 0 and P-value < $\alpha$, therefore we reject the $H_{0}$ hypothesis at a confidence level of 95%. Meaning that we confirm our hypothesis that there is a correlation between temperature and the number of people who succeed in climbing the mountain. <br>
+
+# Part 4 - Summary
+
+In this research we used our experience and the techniques we learned during our course “Introduction to statistic and data analysis in R”.<br>
+First, we have arranged the data and subtracted unnecessary values to get more relevant results.
+After that we did some visualizations and checked connections and correlations between different parameters.<br>
+We did statistical tests and models to examine hypothesizes regarding the weather features and the months. <br>
+Finally we checked the connection between the average temperature and the success climbing rate to better understand connection between them.
+
+
+### <span style= "color:black"> Thank you for reading!
